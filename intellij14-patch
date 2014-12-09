@@ -1,0 +1,28 @@
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+CLASSES_DIR=$SCRIPT_DIR/classes
+TMP_DIR=/tmp/intellij14eap-jar
+JAR_FILE="/Applications/IntelliJ IDEA 14.app/Contents/lib/idea.jar"
+JAR_FILE_MD5=$(md5 "$JAR_FILE" | awk '{ print ( $NF ) }')
+
+echo 'MD5 of jar file: '$JAR_FILE_MD5
+
+if [ "$JAR_FILE_MD5" = "221615881fd424e4acd1b24615a9de99" -o "$JAR_FILE_MD5" = "91fe4b57cea1e7adc31bd0cdcb522e33" -o "$JAR_FILE_MD5" = "5be9d1f1c047654dd490df8ea96e0f5e" -o "$JAR_FILE_MD5" = "1e54cd6ae1950701788230a366cf9c41" -o "$JAR_FILE_MD5" = "b146151a891838bee805428d26a8bf89" ]
+then
+    rm -rf $TMP_DIR
+    mkdir $TMP_DIR
+    mkdir $TMP_DIR/idea
+    cd $TMP_DIR/idea
+    jar xf "$JAR_FILE"
+    cp "$CLASSES_DIR/EditorSearchComponent"*.class "$TMP_DIR"/idea/com/intellij/find
+    cp "$CLASSES_DIR/CloseOn"*.class "$TMP_DIR"/idea/com/intellij/find/editorHeaderActions
+
+    jar cf0 ../idea.jar .
+
+    mv "$JAR_FILE" "$JAR_FILE.original"
+    cp ../idea.jar "$JAR_FILE"
+
+    rm -rf $TMP_DIR
+else
+    echo 'idea.jar failed MD5.  Has it been modified already?'
+fi

@@ -1,0 +1,170 @@
+Index: platform/lang-impl/src/com/intellij/find/editorHeaderActions/CloseOnEnterAction.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- platform/lang-impl/src/com/intellij/find/editorHeaderActions/CloseOnEnterAction.java	(revision )
++++ platform/lang-impl/src/com/intellij/find/editorHeaderActions/CloseOnEnterAction.java	(revision )
+@@ -0,0 +1,51 @@
++/*
++ * Copyright 2000-2014 JetBrains s.r.o.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.intellij.find.editorHeaderActions;
++
++import com.intellij.find.EditorSearchComponent;
++import com.intellij.openapi.actionSystem.AnActionEvent;
++import com.intellij.openapi.actionSystem.CustomShortcutSet;
++import com.intellij.openapi.actionSystem.KeyboardShortcut;
++import com.intellij.openapi.actionSystem.Shortcut;
++import com.intellij.openapi.keymap.KeymapUtil;
++import com.intellij.openapi.project.DumbAware;
++
++import javax.swing.*;
++import java.awt.event.ActionEvent;
++import java.awt.event.ActionListener;
++import java.awt.event.InputEvent;
++import java.awt.event.KeyEvent;
++import java.util.ArrayList;
++
++public class CloseOnEnterAction extends EditorHeaderAction  implements DumbAware {
++  public CloseOnEnterAction(EditorSearchComponent editorSearchComponent, JComponent textField) {
++    super(editorSearchComponent);
++
++    ArrayList<Shortcut> shortcuts = new ArrayList<Shortcut>();
++    if (KeymapUtil.isEmacsKeymap()) {
++      shortcuts.add(new KeyboardShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), null));
++    }
++
++    registerCustomShortcutSet(new CustomShortcutSet(shortcuts.toArray(new Shortcut[shortcuts.size()])), textField);
++  }
++
++  @Override
++  public void actionPerformed(AnActionEvent e) {
++    if(!getEditorSearchComponent().getFindModel().isReplaceState()) {
++      getEditorSearchComponent().close();
++    }
++  }
++}
+Index: platform/lang-impl/src/com/intellij/find/EditorSearchComponent.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- platform/lang-impl/src/com/intellij/find/EditorSearchComponent.java	(revision d0ecb2efd295bf6a3168c6fafbf6a1d0b768bf0d)
++++ platform/lang-impl/src/com/intellij/find/EditorSearchComponent.java	(revision )
+@@ -28,6 +28,7 @@
+ import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
+ import com.intellij.openapi.application.ApplicationManager;
+ import com.intellij.openapi.editor.Editor;
++import com.intellij.openapi.editor.ScrollType;
+ import com.intellij.openapi.editor.event.SelectionEvent;
+ import com.intellij.openapi.editor.event.SelectionListener;
+ import com.intellij.openapi.editor.impl.EditorHeaderComponent;
+@@ -144,6 +145,9 @@
+   private final FindModel myFindModel;
+   private JPanel myReplacementPane;
+ 
++  private int myOriginalSelectionStart;
++  private int myOriginalSelectionEnd;
++
+   public JComponent getToolbarComponent() {
+     return myToolbarComponent;
+   }
+@@ -241,6 +245,9 @@
+     myProject = project;
+     myEditor = editor;
+ 
++    myOriginalSelectionStart = myEditor.getSelectionModel().getSelectionStart();
++    myOriginalSelectionEnd = myEditor.getSelectionModel().getSelectionEnd();
++
+     mySearchResults = new SearchResults(myEditor, myProject);
+     myLivePreviewController = new LivePreviewController(mySearchResults, this);
+ 
+@@ -304,7 +311,6 @@
+       }
+     }
+ 
+-
+     JPanel tailPanel = new NonOpaquePanel(new BorderLayout(5, 0));
+     JPanel tailContainer = new NonOpaquePanel(new BorderLayout(5, 0));
+     tailContainer.add(tailPanel, BorderLayout.EAST);
+@@ -739,6 +745,7 @@
+       }
+     });
+     new CloseOnESCAction(this, editorTextField);
++    new CloseOnEnterAction(this, editorTextField);
+     return editorTextField;
+   }
+ 
+@@ -926,6 +933,18 @@
+       insets.bottom += 2;
+     }
+     return insets;
++  }
++
++  public void restoreOriginalCursorPosition() {
++    // the original offsets might have become out of range due to editing
++    int originalSelectionStart = Math.min(myOriginalSelectionStart, myEditor.getDocument().getTextLength());
++    int originalSelectionEnd = Math.min(myOriginalSelectionEnd, myEditor.getDocument().getTextLength());
++    // restore original position and selection (if any)
++    myEditor.getSelectionModel().setSelection(originalSelectionStart, originalSelectionEnd);
++    myEditor.getCaretModel().moveToOffset(originalSelectionEnd);
++    myEditor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
++    myEditor.getCaretModel().moveToOffset(originalSelectionStart);
++    myEditor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+   }
+ 
+   public void selectAllOccurrences() {
+Index: platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java	(revision d0ecb2efd295bf6a3168c6fafbf6a1d0b768bf0d)
++++ platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java	(revision )
+@@ -17,6 +17,7 @@
+ 
+ import com.intellij.find.EditorSearchComponent;
+ import com.intellij.openapi.actionSystem.*;
++import com.intellij.openapi.keymap.KeymapUtil;
+ import com.intellij.openapi.project.DumbAware;
+ import com.intellij.openapi.util.Getter;
+ import com.intellij.openapi.util.text.StringUtil;
+@@ -47,7 +48,9 @@
+       ContainerUtil
+         .addAll(shortcuts, ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN).getShortcutSet().getShortcuts());
+ 
++      if (!KeymapUtil.isEmacsKeymap()) {
+-      shortcuts.add(new KeyboardShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), null));
++        shortcuts.add(new KeyboardShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), null));
++      }
+     }
+ 
+     registerShortcutsForComponent(shortcuts, editorTextField.get());
+Index: platform/lang-impl/src/com/intellij/find/editorHeaderActions/CloseOnESCAction.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- platform/lang-impl/src/com/intellij/find/editorHeaderActions/CloseOnESCAction.java	(revision d0ecb2efd295bf6a3168c6fafbf6a1d0b768bf0d)
++++ platform/lang-impl/src/com/intellij/find/editorHeaderActions/CloseOnESCAction.java	(revision )
+@@ -37,6 +37,7 @@
+ 
+   @Override
+   public void actionPerformed(AnActionEvent e) {
++    getEditorSearchComponent().restoreOriginalCursorPosition();
+     getEditorSearchComponent().close();
+   }
+ }
