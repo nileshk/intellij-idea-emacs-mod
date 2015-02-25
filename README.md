@@ -7,3 +7,5 @@ I have made the following modifications:
 
 * Incremental search is exited when the enter key is pressed
 * Cancelling incremental search returns the cursor back to the original location before search was started; Based on Ken Chatfield's patch from here: https://youtrack.jetbrains.com/issue/IDEA-117967
+
+Note that Emacs KeyMap must be used for this to work as the behavior is only applied when an Emacs KeyMap is used (checks via `KeyMapUtil.isEmacsKeyMap()`).  This can be a modified Emacs KeyMap, but it has to have originally been based on it.
