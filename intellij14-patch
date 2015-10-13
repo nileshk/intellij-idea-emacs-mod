@@ -7,7 +7,7 @@ JAR_FILE_MD5=$(md5 "$JAR_FILE" | awk '{ print ( $NF ) }')
 
 echo 'MD5 of jar file: '$JAR_FILE_MD5
 
-if [ "$JAR_FILE_MD5" = "8d745efd14c998a2eead0ef525d1e38d" -o "$JAR_FILE_MD5" = "3dddd6c8aca4c419720355e0ee3a90dc" -o "$JAR_FILE_MD5" = "bf07bfa3db8c1a09e8b5d0a527663102" -o "$JAR_FILE_MD5" = "d39b70b97d8d50f2d6c8479a5c720dda" ]
+if [ "$JAR_FILE_MD5" = "8d745efd14c998a2eead0ef525d1e38d" -o "$JAR_FILE_MD5" = "3dddd6c8aca4c419720355e0ee3a90dc" -o "$JAR_FILE_MD5" = "bf07bfa3db8c1a09e8b5d0a527663102" -o "$JAR_FILE_MD5" = "d39b70b97d8d50f2d6c8479a5c720dda" -o "$JAR_FILE_MD5" = "21ac71194523bfbd2e9c57898bbff002" ]
 then
     rm -rf $TMP_DIR
     mkdir $TMP_DIR
