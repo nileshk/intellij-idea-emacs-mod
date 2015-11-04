@@ -1,0 +1,29 @@
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+CLASSES_DIR=$SCRIPT_DIR/classes-idea15
+TMP_DIR=/tmp/intellij15-jar
+JAR_FILE="/Applications/IntelliJ IDEA 15.app/Contents/lib/idea.jar"
+JAR_FILE_MD5=$(md5 "$JAR_FILE" | awk '{ print ( $NF ) }')
+
+echo 'MD5 of jar file: '$JAR_FILE_MD5
+
+if [ "$JAR_FILE_MD5" = "446966d8dfbd07e8ba25f6077db360ed" ]
+then
+    rm -rf $TMP_DIR
+    mkdir $TMP_DIR
+    mkdir $TMP_DIR/idea
+    cd $TMP_DIR/idea
+    jar xf "$JAR_FILE"
+    cp "$CLASSES_DIR/EditorSearchSession"*.class "$TMP_DIR"/idea/com/intellij/find
+    cp "$CLASSES_DIR/SearchReplaceComponent"*.class "$TMP_DIR"/idea/com/intellij/find
+    cp "$CLASSES_DIR/NextOccurrenceAction"*.class "$TMP_DIR"/idea/com/intellij/find/editorHeaderActions
+
+    jar cf0 ../idea.jar .
+
+    mv "$JAR_FILE" "$JAR_FILE.original"
+    cp ../idea.jar "$JAR_FILE"
+
+    rm -rf $TMP_DIR
+else
+    echo 'idea.jar failed MD5 hash.  Has it been modified already?'
+fi

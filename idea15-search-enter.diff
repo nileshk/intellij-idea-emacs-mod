@@ -1,0 +1,54 @@
+diff --git a/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java b/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java
+index 0bcd7e3..d4c1f47 100644
+--- a/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java
++++ b/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java
+@@ -502,6 +502,9 @@ public class SearchReplaceComponent extends EditorHeaderComponent implements Dat
+       }
+     });
+     installCloseOnEscapeAction(textComponent);
++    if (KeymapUtil.isEmacsKeymap()) {
++      installCloseOnEnterAction(textComponent);
++    }
+     return true;
+   }
+ 
+@@ -541,6 +544,18 @@ public class SearchReplaceComponent extends EditorHeaderComponent implements Dat
+     }
+   }
+ 
++  private void installCloseOnEnterAction(@NotNull JTextComponent c) {
++    ActionListener action = new ActionListener() {
++      @Override
++      public void actionPerformed(ActionEvent e) {
++        close();
++      }
++    };
++    if (KeymapUtil.isEmacsKeymap()) {
++      c.registerKeyboardAction(action, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), JComponent.WHEN_FOCUSED);
++    }
++  }
++
+   private void installReplaceOnEnterAction(@NotNull JTextComponent c) {
+     ActionListener action = new ActionListener() {
+       @Override
+diff --git a/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java b/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java
+index 6b97875..e8a0654 100644
+--- a/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java
++++ b/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java
+@@ -20,6 +20,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
+ import com.intellij.openapi.actionSystem.CommonShortcuts;
+ import com.intellij.openapi.actionSystem.IdeActions;
+ import com.intellij.openapi.actionSystem.Shortcut;
++import com.intellij.openapi.keymap.KeymapUtil;
+ import com.intellij.util.containers.ContainerUtil;
+ import org.jetbrains.annotations.NotNull;
+ 
+@@ -44,6 +45,7 @@ public final class NextOccurrenceAction extends PrevNextOccurrenceAction {
+   @NotNull
+   @Override
+   protected List<Shortcut> getSingleLineShortcuts() {
+-    return ContainerUtil.append(Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN), CommonShortcuts.ENTER.getShortcuts());
++    return KeymapUtil.isEmacsKeymap() ? Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN)
++      : ContainerUtil.append(Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN), CommonShortcuts.ENTER.getShortcuts());
+   }
+ }

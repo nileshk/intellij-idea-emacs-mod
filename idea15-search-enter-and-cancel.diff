@@ -1,0 +1,146 @@
+diff --git a/platform/lang-impl/src/com/intellij/find/EditorSearchSession.java b/platform/lang-impl/src/com/intellij/find/EditorSearchSession.java
+index fb7c4f3..83adf24 100644
+--- a/platform/lang-impl/src/com/intellij/find/EditorSearchSession.java
++++ b/platform/lang-impl/src/com/intellij/find/EditorSearchSession.java
+@@ -26,8 +26,10 @@ import com.intellij.openapi.actionSystem.ex.DefaultCustomComponentAction;
+ import com.intellij.openapi.application.ApplicationBundle;
+ import com.intellij.openapi.application.ApplicationManager;
+ import com.intellij.openapi.editor.Editor;
++import com.intellij.openapi.editor.ScrollType;
+ import com.intellij.openapi.editor.event.SelectionEvent;
+ import com.intellij.openapi.editor.event.SelectionListener;
++import com.intellij.openapi.keymap.KeymapUtil;
+ import com.intellij.openapi.project.DumbAwareAction;
+ import com.intellij.openapi.project.Project;
+ import com.intellij.openapi.util.BooleanGetter;
+@@ -63,6 +65,8 @@ public class EditorSearchSession implements SearchSession,
+   private final SearchResults mySearchResults;
+   private final FindModel myFindModel;
+   private final SearchReplaceComponent myComponent;
++  private int myOriginalSelectionStart;
++  private int myOriginalSelectionEnd;
+ 
+   private final LinkLabel<Object> myClickToHighlightLabel = new LinkLabel<Object>("Click to highlight", null, new LinkListener<Object>() {
+     @Override
+@@ -83,6 +87,9 @@ public class EditorSearchSession implements SearchSession,
+ 
+     myEditor = editor;
+ 
++    myOriginalSelectionStart = myEditor.getSelectionModel().getSelectionStart();
++    myOriginalSelectionEnd = myEditor.getSelectionModel().getSelectionEnd();
++
+     mySearchResults = new SearchResults(myEditor, project);
+     myLivePreviewController = new LivePreviewController(mySearchResults, this);
+ 
+@@ -118,6 +125,9 @@ public class EditorSearchSession implements SearchSession,
+       .withCloseAction(new Runnable() {
+         @Override
+         public void run() {
++          if (KeymapUtil.isEmacsKeymap() && myComponent.isSearchCancelled()) {
++            restoreOriginalCursorPosition();
++          }
+           close();
+         }
+       })
+@@ -435,6 +445,18 @@ public class EditorSearchSession implements SearchSession,
+     myFindModel.setStringToFind(text);
+   }
+ 
++  public void restoreOriginalCursorPosition() {
++    // the original offsets might have become out of range due to editing
++    int originalSelectionStart = Math.min(myOriginalSelectionStart, myEditor.getDocument().getTextLength());
++    int originalSelectionEnd = Math.min(myOriginalSelectionEnd, myEditor.getDocument().getTextLength());
++    // restore original position and selection (if any)
++    myEditor.getSelectionModel().setSelection(originalSelectionStart, originalSelectionEnd);
++    myEditor.getCaretModel().moveToOffset(originalSelectionEnd);
++    myEditor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
++    myEditor.getCaretModel().moveToOffset(originalSelectionStart);
++    myEditor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
++  }
++
+   public void selectAllOccurrences() {
+     FindUtil.selectSearchResultsInEditor(myEditor, mySearchResults.getOccurrences().iterator(), -1);
+   }
+diff --git a/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java b/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java
+index 0bcd7e3..c68db35f 100644
+--- a/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java
++++ b/platform/lang-impl/src/com/intellij/find/SearchReplaceComponent.java
+@@ -89,6 +89,8 @@ public class SearchReplaceComponent extends EditorHeaderComponent implements Dat
+   private boolean myMultilineMode;
+   private String myStatusText = "";
+ 
++  private boolean searchCancelled = false;
++
+   @NotNull
+   public static Builder buildFor(@Nullable Project project, @NotNull JComponent component) {
+     return new Builder(project, component);
+@@ -296,6 +298,9 @@ public class SearchReplaceComponent extends EditorHeaderComponent implements Dat
+     return myReplaceTextComponent;
+   }
+ 
++  public boolean isSearchCancelled() {
++    return searchCancelled;
++  }
+ 
+   private void updateSearchComponent(@NotNull String textToSet) {
+     final int oldCaretPosition = mySearchTextComponent != null ? mySearchTextComponent.getCaretPosition() : 0;
+@@ -502,6 +507,9 @@ public class SearchReplaceComponent extends EditorHeaderComponent implements Dat
+       }
+     });
+     installCloseOnEscapeAction(textComponent);
++    if (KeymapUtil.isEmacsKeymap()) {
++      installCloseOnEnterAction(textComponent);
++    }
+     return true;
+   }
+ 
+@@ -532,6 +540,9 @@ public class SearchReplaceComponent extends EditorHeaderComponent implements Dat
+     ActionListener action = new ActionListener() {
+       @Override
+       public void actionPerformed(ActionEvent e) {
++        if (KeymapUtil.isEmacsKeymap()) {
++          searchCancelled = true;
++        }
+         close();
+       }
+     };
+@@ -541,6 +552,18 @@ public class SearchReplaceComponent extends EditorHeaderComponent implements Dat
+     }
+   }
+ 
++  private void installCloseOnEnterAction(@NotNull JTextComponent c) {
++    ActionListener action = new ActionListener() {
++      @Override
++      public void actionPerformed(ActionEvent e) {
++        close();
++      }
++    };
++    if (KeymapUtil.isEmacsKeymap()) {
++      c.registerKeyboardAction(action, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), JComponent.WHEN_FOCUSED);
++    }
++  }
++
+   private void installReplaceOnEnterAction(@NotNull JTextComponent c) {
+     ActionListener action = new ActionListener() {
+       @Override
+diff --git a/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java b/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java
+index 6b97875..e8a0654 100644
+--- a/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java
++++ b/platform/lang-impl/src/com/intellij/find/editorHeaderActions/NextOccurrenceAction.java
+@@ -20,6 +20,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
+ import com.intellij.openapi.actionSystem.CommonShortcuts;
+ import com.intellij.openapi.actionSystem.IdeActions;
+ import com.intellij.openapi.actionSystem.Shortcut;
++import com.intellij.openapi.keymap.KeymapUtil;
+ import com.intellij.util.containers.ContainerUtil;
+ import org.jetbrains.annotations.NotNull;
+ 
+@@ -44,6 +45,7 @@ public final class NextOccurrenceAction extends PrevNextOccurrenceAction {
+   @NotNull
+   @Override
+   protected List<Shortcut> getSingleLineShortcuts() {
+-    return ContainerUtil.append(Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN), CommonShortcuts.ENTER.getShortcuts());
++    return KeymapUtil.isEmacsKeymap() ? Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN)
++      : ContainerUtil.append(Utils.shortcutsOf(IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN), CommonShortcuts.ENTER.getShortcuts());
+   }
+ }
