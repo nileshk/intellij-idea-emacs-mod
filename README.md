@@ -4,11 +4,11 @@ intellij-idea-emacs-mod
 I DON'T RECOMMEND YOU USE THIS PATCH
 ------------------------------------
 
-* Instead of this patch, I recommend instead to install MulgaSoft's Emacs+ plugin:*
+Instead of this patch, I recommend instead to install MulgaSoft's **Emacs+** plugin:
 
 http://www.mulgasoft.com/intellemacsplus
 
-The Emacs+ plugin provides the same behavior as this patch if you set keybindings search forward (C-s) to *isearch-forward* and search backwards (C-r) to *isearch-backward*.
+The Emacs+ plugin provides the same behavior as this patch if you set keybindings search forward (C-s) to **isearch-forward** and search backwards (C-r) to **isearch-backward**.
 
 Description of Patch
 --------------------
